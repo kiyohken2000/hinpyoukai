@@ -1,14 +1,23 @@
 import torch
-from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
-from diffusers.utils import export_to_video
+from diffusers import AnimateDiffPipeline, MotionAdapter, EulerDiscreteScheduler
+from diffusers.utils import export_to_gif
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
 
-pipe = DiffusionPipeline.from_pretrained(
-    "damo-vilab/text-to-video-ms-1.7b", 
-    torch_dtype=torch.float32,  # float32を使用
-    device="cpu"  # CPUを使用するように指定
-)
-pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+device = "cpu"
+dtype = torch.float32  # Float16からFloat32に変更
 
-prompt = "Spiderman is surfing"
-video_frames = pipe(prompt, num_inference_steps=25).frames
-export_to_video(video_frames, output_video_path="generated_video.mp4")
+step = 4  # Options: [1,2,4,8]
+num_inference_steps = 16  # stepの倍数を設定
+
+repo = "ByteDance/AnimateDiff-Lightning"
+ckpt = f"animatediff_lightning_{step}step_diffusers.safetensors"
+base = "emilianJR/epiCRealism"  # Choose to your favorite base model.
+
+adapter = MotionAdapter().to(device, dtype)
+adapter.load_state_dict(load_file(hf_hub_download(repo ,ckpt), device=device))
+pipe = AnimateDiffPipeline.from_pretrained(base, motion_adapter=adapter, torch_dtype=dtype).to(device)
+pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing", beta_schedule="linear")
+
+output = pipe(prompt="A girl smiling", guidance_scale=1.0, num_inference_steps=num_inference_steps)
+export_to_gif(output.frames[0], "animation.gif")
