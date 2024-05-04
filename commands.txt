@@ -12,6 +12,7 @@ python main8.py
 python main9.py
 python main10.py
 python main11.py
+python main12.py
 ```
 
 ## パッケージ書き出し
